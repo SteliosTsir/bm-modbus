@@ -3,6 +3,9 @@
 #   make TARGET=qemu                 build
 #   make TARGET=qemu run             build and run under QEMU
 #   make TARGET=riser TFTPROOT=/srv/tftp netboot   copy the image as boot.img
+#   make test                        host tests (gcc + sanitizers, no SDK needed to run)
+#
+# Demo options go in DEMO_FLAGS, e.g.  make DEMO_FLAGS="-DMODBUS_DEMO_RS485 -DMODBUS_DEMO_DE_LEAD_US=20"
 
 TARGET ?= qemu
 
@@ -24,9 +27,10 @@ OBJS := $(patsubst %.c,$(OUT)/obj/%.$(TARGET).o,$(SRCS))
 LIB  := $(SDK_BUILD)/libplatform_$(TARGET).a
 LD   := $(SDK_BUILD)/ldscripts/bmmap.$(TARGET).ld
 
-APP_CFLAGS = $(CFLAGS) -DDEBUG -I include -I $(SDK_TARGETS_DIR)/$(TARGET)
+DEMO_FLAGS ?=
+APP_CFLAGS = $(CFLAGS) -DDEBUG $(DEMO_FLAGS) -I include -I $(SDK_TARGETS_DIR)/$(TARGET)
 
-.PHONY: all sdk-patch sdk-lib run netboot clean
+.PHONY: all sdk-patch sdk-lib run netboot clean test
 .DEFAULT_GOAL := all
 
 all: $(OUT)/$(NAME).$(TARGET).bin
@@ -61,6 +65,9 @@ ifndef TFTPROOT
 endif
 	cp $< $(TFTPROOT)/boot.img
 	@echo "Copied to $(TFTPROOT)/boot.img"
+
+test:
+	@bash scripts/host-test.sh
 
 clean:
 	rm -rf $(OUT)
