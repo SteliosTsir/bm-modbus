@@ -21,7 +21,7 @@
  *   -DSENSOR_TEMP_DIV=n  -DSENSOR_HUM_DIV=n   register value / DIV = reading (10, 100, ...; HUM_DIV=0 prints the raw value)
  *   -DMODBUS_DEMO_DE_LEAD_US=n -DMODBUS_DEMO_DE_TRAIL_US=n  (RS-485 transceiver switching times)
  */
-#include <modbus/modbus_master.h>
+#include <modbus/modbus_rtu_master.h>
 #include "uart_port.h"
 #include <target_config.h>
 #include <utils/utils.h>
@@ -56,13 +56,13 @@
 #define SENSOR_REPLY_GAP_MS	200
 #endif
 #ifndef SENSOR_TEMP_DIV
-#define SENSOR_TEMP_DIV		100	/* this sensor reports hundredths of a degree (the datasheet says tenths) */
+#define SENSOR_TEMP_DIV		100	
 #endif
 #ifndef SENSOR_HUM_DIV
-#define SENSOR_HUM_DIV		0	/* unknown for this sensor: 0 = print the raw register value */
+#define SENSOR_HUM_DIV		100	
 #endif
 #ifndef SENSOR_PERIOD_MS
-#define SENSOR_PERIOD_MS	5000
+#define SENSOR_PERIOD_MS	600
 #endif
 #ifndef SENSOR_TIMEOUT_MS
 #define SENSOR_TIMEOUT_MS	2000

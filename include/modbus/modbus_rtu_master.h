@@ -21,7 +21,7 @@
 #ifndef MODBUS_MASTER_H
 #define MODBUS_MASTER_H
 
-#include <modbus/modbus_rtu_slave.h>	/* modbus_serial_ops_t, modbus_slave_cfg_t */
+#include <modbus/modbus_rtu.h>
 
 typedef struct {
 	uint32_t requests;	/* transactions started */

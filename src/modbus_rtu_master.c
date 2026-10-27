@@ -1,4 +1,4 @@
-#include <modbus/modbus_master.h>
+#include <modbus/modbus_rtu_master.h>
 
 static void wait_us(modbus_master_t *m, uint32_t us)
 {
@@ -35,7 +35,7 @@ int modbus_master_init(modbus_master_t *m, const modbus_serial_ops_t *ops, const
 
 	m->ops = *ops;
 	m->cfg = *cfg;
-	m->t35_us = modbus_slave_t35_us(cfg->baud, cfg->parity, cfg->stop_bits);
+	m->t35_us = modbus_rtu_t35_us(cfg->baud);
 	m->reply_gap_us = 0;
 	m->timeout_ms = timeout_ms;
 	m->broadcast_wait_ms = 100;	/* the spec suggests 100..200 ms turnaround */

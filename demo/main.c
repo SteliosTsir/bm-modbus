@@ -12,6 +12,6 @@ void main(void)
 #ifdef MODBUS_ROLE_MASTER
 	master();
 #else
-	slave();
+	//slave();
 #endif
 }

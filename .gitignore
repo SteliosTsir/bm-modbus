@@ -3,8 +3,4 @@ build/
 *.elf
 *.bin
 
-demo/modbus_slave.c
-
-src/modbus_rtu_slave.c
-
-include/modbus/modbus_rtu_slave.h
+*.skip
