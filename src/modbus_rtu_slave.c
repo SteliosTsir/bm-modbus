@@ -46,7 +46,8 @@ int modbus_slave_init(modbus_slave_t *s, uint8_t slave_id, const modbus_backend_
 	s->t35_us = modbus_slave_t35_us(cfg->baud, cfg->parity, cfg->stop_bits);
 	s->rx_len = 0;
 	s->bad = s->overflow = s->err_pending = false;
-	s->stats = (modbus_slave_stats_t){0};
+	s->stats.frames_answered = s->stats.frames_ignored = s->stats.frames_dropped = 0;
+	s->stats.line_errors = s->stats.bytes_discarded = 0;
 
 	/* Never leave the bus driven */
 	if (s->ops.set_tx) s->ops.set_tx(s->ops.ctx, false);

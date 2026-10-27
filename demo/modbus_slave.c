@@ -16,6 +16,7 @@
  *   -DMODBUS_DEMO_STRICT_T15         drop frames with a character gap above t1.5
  */
 #include <platform/interfaces/uart.h>
+#include "uart_port.h"
 #include <modbus/modbus_rtu_slave.h>
 #include <target_config.h>	/* PLAT_UART_BAUD_RATE */
 #include <stdint.h>
@@ -59,7 +60,11 @@ static struct {
 	uint16_t input[N_INPUT];
 } plant;
 
-static inline bool bit_get(const uint8_t *a, unsigned i) { return (a[i / 8] >> (i % 8)) & 1u; }
+static inline bool bit_get(const uint8_t *a, unsigned i)
+{ 
+	return (a[i / 8] >> (i % 8)) & 1u;
+}
+
 static inline void bit_set(uint8_t *a, unsigned i, bool v)
 {
 	if (v) a[i / 8] |= (uint8_t)(1u << (i % 8));
@@ -70,7 +75,8 @@ static inline void bit_set(uint8_t *a, unsigned i, bool v)
 
 static void plant_init(void)
 {
-	memset(&plant, 0, sizeof(plant));
+	uint8_t *p = (uint8_t *)&plant;	
+	for (size_t i = 0; i < sizeof(plant); i++) p[i] = 0;
 	plant.holding[HR_SETPOINT]    = 600;
 	plant.holding[HR_ALARM_LIMIT] = 800;
 	plant.input[IR_TEMPERATURE]   = AMBIENT_DECI_C;
@@ -96,43 +102,56 @@ static void plant_step(void)
 static modbus_exception_t read_bits(const uint8_t *src, unsigned n, uint16_t addr, uint16_t count, uint8_t *dst)
 {
 	if ((unsigned)addr + count > n) return MODBUS_EX_ILLEGAL_DATA_ADDR;
-	memset(dst, 0, (count + 7u) / 8u);
+	for (unsigned i = 0; i < (count + 7u) / 8u; i++) dst[i] = 0;
 	for (uint16_t i = 0; i < count; i++)
 		if (bit_get(src, addr + i)) bit_set(dst, i, true);
 	return MODBUS_EX_NONE;
 }
-static modbus_exception_t be_read_coils(uint16_t a, uint16_t c, uint8_t *d) { return read_bits(plant.coils, N_COILS, a, c, d); }
-static modbus_exception_t be_read_discrete(uint16_t a, uint16_t c, uint8_t *d) { return read_bits(plant.discrete, N_DISCRETE, a, c, d); }
+
+static modbus_exception_t be_read_coils(uint16_t a, uint16_t c, uint8_t *d)
+{ 
+	return read_bits(plant.coils, N_COILS, a, c, d);
+}
+
+static modbus_exception_t be_read_discrete(uint16_t a, uint16_t c, uint8_t *d){
+	return read_bits(plant.discrete, N_DISCRETE, a, c, d);
+}
+
 static modbus_exception_t be_read_holding(uint16_t a, uint16_t c, uint16_t *d)
 {
 	if ((unsigned)a + c > N_HOLDING) return MODBUS_EX_ILLEGAL_DATA_ADDR;
 	for (uint16_t i = 0; i < c; i++) d[i] = plant.holding[a + i];
 	return MODBUS_EX_NONE;
 }
+
 static modbus_exception_t be_read_input(uint16_t a, uint16_t c, uint16_t *d)
 {
 	if ((unsigned)a + c > N_INPUT) return MODBUS_EX_ILLEGAL_DATA_ADDR;
 	for (uint16_t i = 0; i < c; i++) d[i] = plant.input[a + i];
 	return MODBUS_EX_NONE;
 }
+
 static modbus_exception_t be_write_coil(uint16_t a, bool s)
 {
 	if (a >= N_COILS) return MODBUS_EX_ILLEGAL_DATA_ADDR;
 	bit_set(plant.coils, a, s);
 	return MODBUS_EX_NONE;
 }
+
 static modbus_exception_t be_write_holding(uint16_t a, uint16_t v)
 {
 	if (a >= N_HOLDING) return MODBUS_EX_ILLEGAL_DATA_ADDR;
 	plant.holding[a] = v;
 	return MODBUS_EX_NONE;
 }
+
 static modbus_exception_t be_write_coils(uint16_t a, uint16_t c, const uint8_t *s)
 {
 	if ((unsigned)a + c > N_COILS) return MODBUS_EX_ILLEGAL_DATA_ADDR;
 	for (uint16_t i = 0; i < c; i++) bit_set(plant.coils, a + i, bit_get(s, i));
 	return MODBUS_EX_NONE;
 }
+
 static modbus_exception_t be_write_holdings(uint16_t a, uint16_t c, const uint16_t *s)
 {
 	if ((unsigned)a + c > N_HOLDING) return MODBUS_EX_ILLEGAL_DATA_ADDR;
@@ -141,14 +160,14 @@ static modbus_exception_t be_write_holdings(uint16_t a, uint16_t c, const uint16
 }
 
 static const modbus_backend_t backend = {
-	.read_coils                    = be_read_coils,
-	.read_discrete_inputs          = be_read_discrete,
-	.read_multi_holding_registers  = be_read_holding,
-	.read_input_registers          = be_read_input,
-	.write_coil                    = be_write_coil,
-	.write_single_holding_register = be_write_holding,
-	.write_multi_coils             = be_write_coils,
-	.write_multi_holding_registers = be_write_holdings
+	.read_coils                    = be_read_coils,			/* FC = 0x01 */
+	.read_discrete_inputs          = be_read_discrete,		/* FC = 0x02 */
+	.read_multi_holding_registers  = be_read_holding,		/* FC = 0x03 */
+	.read_input_registers          = be_read_input,			/* FC = 0x04 */
+	.write_coil                    = be_write_coil,			/* FC = 0x05 */
+	.write_single_holding_register = be_write_holding,		/* FC = 0x06 */
+	.write_multi_coils             = be_write_coils,		/* FC = 0x0F */
+	.write_multi_holding_registers = be_write_holdings		/* FC = 0x10 */
 };
 
 /* ---------------- Serial port glue ---------------- */
@@ -160,12 +179,28 @@ static uint64_t port_now_us(void *ctx)
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return (uint64_t)ts.tv_sec * 1000000ull + (uint64_t)ts.tv_nsec / 1000u;
 }
-static int  port_getc(void *ctx) { (void)ctx; return uart_getc(); }
-static void port_putc(void *ctx, uint8_t b) { (void)ctx; uart_putc_raw(b); }
-static void port_flush(void *ctx) { (void)ctx; uart_tx_flush(); }
+
+static int  port_getc(void *ctx)
+{
+	(void)ctx; return uart_getc();
+}
+
+static void port_putc(void *ctx, uint8_t b)
+{
+	(void)ctx; uart_port_putc_raw(b);
+}
+
+static void port_flush(void *ctx)
+{
+	(void)ctx; uart_port_tx_flush();
+}
+
 #ifdef MODBUS_DEMO_RS485
 /* Driver enable on the UART RTS pin; boards that wire DE/RE to a GPIO replace this */
-static void port_set_tx(void *ctx, bool en) { (void)ctx; uart_set_rts(en); }
+static void port_set_tx(void *ctx, bool en)
+{
+	(void)ctx; uart_port_set_rts(en);
+}
 #endif
 
 static const modbus_serial_ops_t port_ops = {
@@ -178,7 +213,7 @@ static const modbus_serial_ops_t port_ops = {
 #endif
 };
 
-void main(void)
+void slave(void)
 {
 	static modbus_slave_t slave;
 	modbus_slave_cfg_t cfg = {
@@ -204,8 +239,8 @@ void main(void)
 #endif
 	};
 
-	/* The console UART is used as the Modbus port: no printing from here on */
-	uart_set_format(cfg.parity == MODBUS_PARITY_NONE ? UART_PARITY_NONE : UART_PARITY_EVEN, cfg.stop_bits);
+	/* The console UART is used as the Modbus port */
+	uart_port_set_format(cfg.parity != MODBUS_PARITY_NONE, cfg.stop_bits);
 
 	plant_init();
 	if (modbus_slave_init(&slave, MODBUS_DEMO_ADDRESS, &backend, &port_ops, &cfg) != 0)

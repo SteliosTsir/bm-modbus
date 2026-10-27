@@ -46,15 +46,11 @@ The demo takes over the console UART, so nothing else may print on it.
 
 ## SDK patches
 
-`patches/` holds small generic changes the SDK does not have yet:
-0001 memset bound, 0002 global trap handlers for LTO, 0003 `uart_putc_raw`,
-0004 `uart_set_format`, `uart_tx_flush`, `uart_set_rts`. `make` applies them to the
-submodule working tree (skipping any already applied). Because of that the
-submodule shows as modified; `.gitmodules` sets `ignore = dirty` to hide it.
-When a fix is merged upstream, bump the submodule and delete the patch.
+None are needed. The UART operations Modbus needs beyond `uart_getc()` (raw
+transmit, wait for the shifter, 8E1/8N2 line format, RTS) are in `demo/uart_port.c`,
+and the code avoids `memset()` because the SDK's version can overrun short buffers.
 
 ## Layout
 
     include/modbus/   public headers      src/    PDU, RTU, slave engine
-    demo/             example slave       tests/  host tests
-    patches/          changes for sdk/    scripts/apply-sdk-patches.sh, host-test.sh
+    demo/             example slave + uart_port   tests/  host tests
